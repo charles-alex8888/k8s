@@ -1,0 +1,54 @@
+server:
+  port: 8080
+
+k8s:
+  service:
+    demo-business-backend: http://demo-business-backend-prod-svc.demo:8080
+    demo-admin-backend: http://demo-admin-backend-prod-svc.demo:8080
+
+spring:
+  output:
+    ansi:
+      enabled: always
+  main:
+    allow-bean-definition-overriding: true
+  datasource:
+    tidb:
+      name: mysql-data
+      url: jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DATABASE}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=round&allowMultiQueries=true&serverTimezone=GMT%2B8
+      username: ${MYSQL_USERNAME}
+      password: ${MYSQL_PASSWORD}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      type: com.alibaba.druid.pool.DruidDataSource # 使用druid数据源
+      initialSize: 10 #初始化连接数量，最大最小连接数
+      maxActive: 100
+      minIdle: 3
+      maxWait: 600000  #获取连接等待超时的时间
+      removeAbandoned: true  #超过时间限制是否回收
+      removeAbandonedTimeout: 180 #超过时间限制多长
+      timeBetweenEvictionRunsMillis: 600000 #配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒
+      minEvictableIdleTimeMillis: 300000 #配置一个连接在池中最小生存的时间，单位是毫秒
+      validationQuery: SELECT 1 FROM DUAL #用来检测连接是否有效的sql，要求是一个查询语句
+      testWhileIdle: true #申请连接的时候检测
+      testOnBorrow: false #申请连接时执行validationQuery检测连接是否有效，配置为true会降低性能
+      testOnReturn: false #归还连接时执行validationQuery检测连接是否有效，配置为true会降低性能
+      poolPreparedStatements: true #打开PSCache，并且指定每个连接上PSCache的大小
+      maxPoolPreparedStatementPerConnectionSize: 100
+      connectionProperties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=5000
+      filters: stat #属性类型是字符串，通过别名的方式配置扩展插件，常用的插件有：监控统计用的filter:stat 日志用的filter:log4j 防御SQL注入的filter:wall
+    output:
+      ansi:
+        enabled: always
+    main:
+      allow-bean-definition-overriding: true
+  redis:
+    ssl: true
+    password: ${REDIS_PASSWORD}
+    host: ${REDIS_HOST}
+    port: ${REDIS_PORT}
+   # cluster:
+   #   nodes: ${REDIS_HOST}:${REDIS_PORT}
+   #   max-redirects: 3    
+usercenter:
+  manage-url: http://xx.com
+  authentication-url: http://xx.com

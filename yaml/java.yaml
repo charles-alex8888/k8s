@@ -1,0 +1,145 @@
+pipeline {
+  agent {
+    node {
+      label 'maven'
+    }
+
+  }
+  stages {
+    stage('拉取源代码') {
+      steps {
+        checkout([$class: 'GitSCM', branches: [[name: 'master']], doGenerateSubmoduleConfigurations: false, extensions: [[
+                                                        $class: 'SubmoduleOption',
+                                                        disableSubmodules: false,
+                                                        parentCredentials: true,
+                                                        recursiveSubmodules: true,
+                                                        reference: '',
+                                                        trackingSubmodules: false
+                                                      ]],
+                                                      submoduleCfg: [],
+                                                      userRemoteConfigs: [[credentialsId: 'git-id', url: 'http://xx/xx/demo.git']]])
+          sh '''cat > demo-admin-api/admin.yml <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-admin-backend-prod
+  namespace: demo
+  labels:
+    app: demo-admin-backend-prod
+spec:
+  replicas: 3
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: demo-admin-backend-prod
+  template:
+    metadata:
+      labels:
+        app: demo-admin-backend-prod
+    spec:
+      containers:
+        - name: demo-admin-backend-prod
+          image: $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:PROD-$BUILD_NUMBER
+          ports:
+            - containerPort: 8080
+          env:
+            - name: REDIS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: cp-redis
+                  key: REDIS_HOST
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cp-redis
+                  key: REDIS_PASSWORD
+            - name: REDIS_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: cp-redis
+                  key: REDIS_PORT
+            - name: NAMESPACE
+              valueFrom:
+                secretKeyRef:
+                  name: cp-nacos
+                  key: NAMESPACE
+            - name: PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cp-nacos
+                  key: PASSWORD
+            - name: REGISTER_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: cp-nacos
+                  key: REGISTER_HOST
+            - name: REGISTER_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: cp-nacos
+                  key: REGISTER_PORT
+            - name: USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: cp-nacos
+                  key: USERNAME
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: demo-admin-backend-prod
+  name: demo-admin-backend-prod-svc
+  namespace: demo
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30101
+  selector:
+    app: demo-admin-backend-prod
+  type: NodePort
+
+EOF
+'''
+          sh '''cat > demo-admin-api/Dockerfile <<EOF
+
+FROM openjdk:8-jdk-alpine
+VOLUME /tmp
+ADD demo-admin-api/target/*.jar app.jar
+ENV JAVA_OPTS="-Xms256m"
+ENV TZ=Asia/Shanghai
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+ENTRYPOINT [ "sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar /app.jar" ]
+EXPOSE 8080
+EOF
+'''
+        }
+      }
+      stage('构建并推送镜像') {
+        steps {
+          container('maven') {
+            sh 'mvn clean package -Dmaven.test.skip=true -e'
+            sh 'docker build -f demo-admin-api/Dockerfile -t $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:PROD-$BUILD_NUMBER .'
+              withCredentials([usernamePassword(credentialsId : 'registry-id' ,passwordVariable : 'DOCKER_PASSWORD' ,usernameVariable : 'DOCKER_USERNAME' ,)]) {
+            sh 'echo $DOCKER_PASSWORD'
+            sh 'echo "$DOCKER_PASSWORD" | docker login $REGISTRY -u "$DOCKER_USERNAME" --password-stdin'
+              sh 'docker push $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:PROD-$BUILD_NUMBER'
+            }
+
+          }
+
+        }
+      }
+      stage('发布到PROD环境') {
+        steps {
+          kubernetesDeploy(enableConfigSubstitution: true, deleteResource: false, kubeconfigId: 'kubeconfig-id', configs: 'demo-admin-api/admin.yml')
+        }
+      }
+    }
+  }

@@ -1,0 +1,59 @@
+# pod内存限制
+~~~ yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: memory-demo
+  namespace: example
+spec:
+  containers:
+  - name: memory-demo-str
+    images: polinux/stress
+    resources:
+      limits:
+        memory: "200Mi"
+      requests:
+        memory: "100Mi"
+    command: ["stree"]
+    args: ["--vm", "1", "--vm-bytes", "150M", "--vm-hang", "1"]
+~~~
+
+# pod cpu限制
+~~~ yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cpu-demo
+  namespace: example
+spec:
+  containers:
+  - name: cpu-demo-ctr
+    images: vish/stress
+    resources:
+      limits:
+        cpu: "1"
+      requests:
+        cpu: "0.5"
+    args: 
+    - -cpus
+    - "2"
+~~~
+
+# ns内存限制
+~~~ yaml
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: memory-limit-range
+spec:
+  limits:
+  - default:
+      memory: 512Mi
+    defaultRequest:
+      memory: 256Mi
+    type: Container
+~~~
+~~~ bash
+kubectl apply -f xx.yaml -n ns
+kubectl get limitrange -n ns
+~~~

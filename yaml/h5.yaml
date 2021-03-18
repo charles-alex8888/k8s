@@ -20,7 +20,7 @@ EXPOSE 80
 
 EOF
 '''
-        sh '''cat > demo.yml <<EOF
+sh '''cat > demo.yml <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -45,9 +45,50 @@ spec:
       containers:
         - name: demo-h5-frontend-prod
           image: $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:PROD-$BUILD_NUMBER
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "512Mi"
+            limits:
+              cpu: "300m"
+              memory: "2048Mi"
+          readinessProbe:
+            periodSeconds: 10
+            initialDelaySeconds: 10
+            httpGet:
+              port: http
+              path: /
+          livenessProbe:
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            httpGet:
+              port: http
+              path: /
           ports:
-            - containerPort: 80
-
+            - name: http
+              containerPort: 80
+---
+kind: HorizontalPodAutoscaler
+apiVersion: autoscaling/v2beta1
+metadata:
+  name: lottery-h5-frontend-prod-hpa
+  namespace: lottery
+spec:
+  minReplicas: 3
+  maxReplicas: 12
+  scaleTargetRef:
+    kind: Deployment
+    apiVersion: apps/v1
+    name: lottery-h5-frontend-prod
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        targetAverageValue: 1700Mi
 ---
 
 apiVersion: v1

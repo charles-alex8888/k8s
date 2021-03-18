@@ -43,8 +43,26 @@ spec:
       containers:
         - name: demo-admin-backend-prod
           image: $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:PROD-$BUILD_NUMBER
+          readinessProbe:
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            tcpSocket:
+              port: http
+          livenessProbe:
+            periodSeconds: 30
+            httpGet:
+              port: http
+              path: /admin/member/memberInfo/page
           ports:
-            - containerPort: 8080
+            - name: http
+              containerPort: 8080
+          resources:
+            requests:
+              cpu: "300m"
+              memory: "1000Mi"
+            limits:
+              cpu: "700m"
+              memory: "4096Mi"
           env:
             - name: REDIS_HOST
               valueFrom:

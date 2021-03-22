@@ -222,6 +222,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: grafana-loki
+  namespace: loki
 spec:
   selector:
     app: grafana-loki

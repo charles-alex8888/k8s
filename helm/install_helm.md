@@ -50,3 +50,10 @@ helm search repo stable
 
 # 部署
 > helm install --name mariadb -n namespace_name stable/mariadb --version version -f value.yaml
+
+# 查看helm 安装的资源列表
+~~~ bash
+helm list --all-namespaces
+helm list
+~~~
+

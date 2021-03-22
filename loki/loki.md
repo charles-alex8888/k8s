@@ -254,20 +254,4 @@ loki            ClusterIP   10.68.187.228   <none>        3100/TCP         124m
 loki-headless   ClusterIP   None            <none>        3100/TCP         124m
 ```
 
-## 访问grafana
 
-- 用户名密码 见 上面的清单 env字段
-
-![image-20210319171228337](loki/image-20210319171228337.png)
-
-![image-20210319171330355](loki/image-20210319171330355.png)
-
-![image-20210319171406964](loki/image-20210319171406964.png)
-
-![image-20210319171431088](loki/image-20210319171431088.png)
-
-![image-20210319171705207](loki/image-20210319171705207.png)
-
-![image-20210319171811781](loki/image-20210319171811781.png)
-
-![image-20210319171922259](loki/image-20210319171922259.png)ls

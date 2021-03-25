@@ -173,13 +173,7 @@ CATALINA_OPTS="$CATALINA_OPTS -javaagent:/usr/local/skywalking/agent/skywalking-
 
 调用一次api然后 去ui界面查看
 
-![image-20210208195354404](skywalking/image-20210208195354404.png)
 
-![image-20210208195544323](skywalking/image-20210208195544323.png)
-
-![image-20210208195623889](skywalking/image-20210208195623889.png)
-
-![image-20210208195731245](skywalking/image-20210208195731245.png)
 
 ### Agent-springboot使用方法
 

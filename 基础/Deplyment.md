@@ -6,7 +6,7 @@
 ### 扩缩容
 > kubectl scale deplyment nginx --replicas=2
 ###  更改镜像版本
-> kubectl set image deployment/nginx nginx=nginx:1.19.7 --record=true
+> kubectl set image deployment/nginx nginx=nginx:1.19.7 --record
 ### 查看deployment历史版本
 > kubectl rollout history deploymentnginx
 ### 回滚

@@ -35,7 +35,7 @@ kubectl drain <node_name> --ignore-daemonsets --force --delete-emptydir-data
 
 # ***声明式***
 ### 生成deplyment的yaml文件
-> kubectl create deployment nginx --image-nginx --dry-run-client -o yaml > nginx.yaml
+> kubectl create deployment nginx --image-nginx --dry-run=client -o yaml > nginx.yaml
 ### 创建
 > kubectl apply -f nginx.yaml
 ### 查看创建的资源

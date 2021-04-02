@@ -16,7 +16,7 @@ spec:
     requests:
       storage: 20Gi
 ~~~
-> kubectl apply -f vpc.yaml
+> kubectl apply -f pvc.yaml
 
 # pod增加安全上线文
 ~~~ yaml

@@ -18,7 +18,7 @@ spec:
 ~~~
 > kubectl apply -f pvc.yaml
 
-# pod增加安全上线文
+# grafana的pod增加安全上线文
 ~~~ yaml
     spec:
       securityContext:

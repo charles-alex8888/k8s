@@ -12,3 +12,7 @@ snap disable microk8s
 # 卸载
 snap remove microk8s
 ~~~
+
+
+# 二进制安装 k8s 参考
+https://github.com/easzlab/kubeasz

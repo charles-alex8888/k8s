@@ -16,3 +16,6 @@ snap remove microk8s
 
 # 二进制安装 k8s 参考
 https://github.com/easzlab/kubeasz
+
+# Argo CD - Kubernetes的声明式GitOps持续交付
+https://www.mikesay.com/ebooks/argocd/

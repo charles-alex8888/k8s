@@ -13,6 +13,12 @@ snap disable microk8s
 snap remove microk8s
 ~~~
 
+# zsh下kubectl 命令补全
+~~~ bash
+source <(kubectl completion zsh)
+echo 'source <(kubectl completion zsh)' >> ~/.zshrc
+~~~
+
 
 # 二进制安装 k8s 参考
 https://github.com/easzlab/kubeasz

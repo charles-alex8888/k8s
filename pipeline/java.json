@@ -1,0 +1,165 @@
+pipeline{
+    agent{
+        kubernetes{
+            inheritFrom 'maven-jdk11'
+        }
+    }
+    stages {
+        stage('拉取代码'){
+            steps{
+                sh 'ls'
+                git branch: 'main', credentialsId: '08ae33ec-ea28-46ec-afe9-06fd7fd0ed72', url: 'https://github.com/OrochW/testcms-java.git'
+            }
+        }
+        stage('编译代码'){
+            steps {
+                container('maven-jdk11'){
+                    sh """
+                        cd publiccms-parent
+                        mvn clean package
+                   """
+                }
+            }
+        }
+        stage('推送镜像'){
+            steps {
+                container('docker'){
+                    sh '''
+                        cat > Dockerfile <<'EOF'
+FROM openjdk:11-jdk
+ADD publiccms-parent/publiccms/target/publiccms.war /opt/publiccms.war
+ADD data /data
+ENV PORT="8090"
+ENV CONTEXTPATH="/publiccms"
+ENV FILEPATH="/data/publiccms"
+VOLUME /data/publiccms
+RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+  echo 'Asia/Shanghai' >/etc/timezone
+ENTRYPOINT java -jar -Dcms.port=$PORT -Dcms.contextPath=$CONTEXTPATH -Dcms.filePath=$FILEPATH /opt/publiccms.war > /var/log/publiccms.log
+EXPOSE 8090
+EOF
+'''
+                    sh """
+                    docker build . -t 192.168.234.20/testcms-java/testcms-java:${BUILD_NUMBER}
+                    """
+                    withCredentials([usernamePassword(credentialsId: 'harbor', passwordVariable: 'P', usernameVariable: 'U')]) {
+                    sh 'docker login 192.168.234.20 -u ${U} -p ${P}'
+                    sh 'docker push 192.168.234.20/testcms-java/testcms-java:${BUILD_NUMBER}'
+                    }
+                }
+            }
+        }
+        stage('部署'){
+            steps{
+                sh """
+cat > testcms-java.yaml << EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name:  testcms-java
+  namespace: test
+  labels:
+    app:  testcms-java
+spec:
+  selector:
+    matchLabels:
+      app: testcms-java
+  replicas: 2
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app:  testcms-java
+    spec:
+      # initContainers:
+        # Init containers are exactly like regular containers, except:
+          # - Init containers always run to completion.
+          # - Each init container must complete successfully before the next one starts.
+      containers:
+      - name:  testcms-java
+        image:  192.168.234.20/testcms-java/testcms-java:${BUILD_NUMBER}
+        resources:
+          requests:
+            cpu: 500m
+            memory: 500Mi
+          limits:
+            cpu: 500m
+            memory: 500Mi
+        livenessProbe:
+          tcpSocket:
+            port: 8090
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /publiccms
+            port: 8090
+          initialDelaySeconds: 30
+          timeoutSeconds: 2
+          successThreshold: 1
+          failureThreshold: 3
+          periodSeconds: 10
+        ports:
+        - containerPort:  8090
+          name:  testcms-java
+        env:
+            - name: PORT
+              value: "8090"
+            - name: CONTEXTPATH
+              value: /publiccms
+            - name: FILEPATH
+              value: /data/publiccms
+        ports: #定义端口名和端口号 以方便其他地方引用
+            - containerPort:  8090
+              name:  testcms-java
+        volumeMounts: #引用volumes
+            - name: cms-data #引用volumes-name
+              mountPath: /data/publiccms
+      volumes: #引用pvc
+        - name: cms-data #定义卷名
+          persistentVolumeClaim:
+            claimName: cms-pvc #引用pvc-name
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cms-pvc
+  namespace: test
+  labels:
+    app: cms-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-provisioner #使用指定storageClassName
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cms-svc
+  namespace: test
+spec:
+  selector: #svc通过标签去找相同namespace下的pod是否有匹配的标签
+    app: testcms-java
+  ports:
+    - port: 8090
+      targetPort: testcms-java #引用pod端口
+      nodePort: 31006
+  type: NodePort
+EOF
+"""
+                kubernetesDeploy configs: 'testcms-java.yaml', kubeconfigId: 'kubeconfig-cd'
+            }
+        }
+    }
+}

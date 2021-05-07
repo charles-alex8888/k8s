@@ -1,0 +1,123 @@
+pipeline{
+    agent{
+        kubernetes{
+            inheritFrom 'nodejs'
+        }
+    }
+    stages {
+        stage('拉取代码'){
+            steps{
+                git branch: 'main', credentialsId: '08ae33ec-ea28-46ec-afe9-06fd7fd0ed72', url: 'https://github.com/OrochW/testcms-nodejs.git'
+                sh 'ls'
+            }
+        }
+        stage('推送镜像'){
+            steps {
+                container('docker'){
+                    sh '''
+                        cat > Dockerfile << 'EOF'
+FROM node:14.16.1
+COPY ./ /usr/local/Pandora
+WORKDIR /usr/local/Pandora
+RUN npm i --unsafe-perm && \
+  ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+  echo 'Asia/Shanghai' >/etc/timezone
+ENTRYPOINT npm run dev
+EXPOSE 10003
+EOF
+'''
+                    sh """
+                    docker build . -t 192.168.234.20/testcms-nodejs/testcms-nodejs:${BUILD_NUMBER}
+                    """
+                    withCredentials([usernamePassword(credentialsId: 'harbor', passwordVariable: 'P', usernameVariable: 'U')]) {
+                    sh 'docker login 192.168.234.20 -u ${U} -p ${P}'
+                    sh 'docker push 192.168.234.20/testcms-nodejs/testcms-nodejs:${BUILD_NUMBER}'
+                    }
+                }
+            }
+        }
+        stage('部署'){
+            steps{
+                sh """
+cat > testcms-node.yaml << EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name:  nodejs-cms
+  namespace: test
+  labels:
+    app:  nodejs-cms
+spec:
+  selector:
+    matchLabels:
+      app: nodejs-cms
+  replicas: 2
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app:  nodejs-cms
+    spec:
+      containers:
+        - name:  nodejs-cms
+          image:  192.168.234.20/testcms-nodejs/testcms-nodejs:${BUILD_NUMBER}
+          resources:
+            requests:
+              cpu: 500m
+              memory: 500Mi
+            limits:
+              cpu: 500m
+              memory: 500Mi
+          livenessProbe:
+            tcpSocket:
+              port: 10003
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 10003
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+            periodSeconds: 10
+          ports:
+            - containerPort:  10003
+              name:  http
+#          volumeMounts:
+#            - name: nodejsconf
+#              mountPath: /usr/local/Pandora/config/
+#      volumes:
+#        - name: nodejsconf
+#          configMap:
+#            name: nodejs-cms
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodejscms-svc
+  namespace: test
+spec:
+  selector:
+    app: nodejs-cms
+  ports:
+    - port: 10003
+      targetPort: 10003
+      nodePort: 30003
+  type: NodePort
+EOF
+"""
+                kubernetesDeploy configs: 'testcms-node.yaml', kubeconfigId: 'kubeconfig-cd'
+            }
+        }
+    }
+}

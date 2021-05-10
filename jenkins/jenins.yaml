@@ -138,7 +138,7 @@ metadata:
   name: jenkins
   namespace: jenkins
   annotations:
-    nginx.ingress.kubernetes.io/whitelist-source-range: '8.210.113.19/32'
+    nginx.ingress.kubernetes.io/whitelist-source-range: '172.16.0.0/16'
 spec:
   ingressClassName: nginx-ds
   rules:

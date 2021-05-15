@@ -1,5 +1,6 @@
 ~~~ bash
-cat >/etc/sysctl.d/k8s.conf << EOF
+#!/bin/bash
+cat >/etc/sysctl.d/k8s.conf << 'EOF'
 net.ipv4.tcp_keepalive_time = 600
 net.ipv4.tcp_keepalive_intvl = 30
 net.ipv4.tcp_keepalive_probes = 10

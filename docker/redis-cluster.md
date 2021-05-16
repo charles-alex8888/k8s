@@ -93,7 +93,7 @@ services:
     command: redis-server /usr/local/etc/redis/redis.conf
 ~~~
 
-启动后进入任意一个容器执行一下命令
+启动后进入任意一个容器执行以下命令
 
 ~~~
 # 启动

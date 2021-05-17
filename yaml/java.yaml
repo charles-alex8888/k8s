@@ -232,11 +232,12 @@ EOF
     post {
         //任务失败执行
         failure {
-          sh "wget --post-data 'content=彩票 线上K8S环境 business 流水线执行失败' https://discord.com/api/webhooks/831799591984693249/O3pgcn-AEBVmkkqeROpk6SDXwX02tVocV5y6zTDZwX6DIWOfo71ms3320dlNuryijlOY"
+          sh "wget --post-data 'content=business 流水线执行失败' 
+          xxxx"
         }
         //任务成功后执行
         success {
-          sh "wget --post-data 'content=彩票 线上K8S环境 business 流水线执行完成' https://discord.com/api/webhooks/831799591984693249/O3pgcn-AEBVmkkqeROpk6SDXwX02tVocV5y6zTDZwX6DIWOfo71ms3320dlNuryijlOY"
+          sh "wget --post-data 'content=business 流水线执行完成' xxxxx"
         }    
     }
   }

@@ -17,15 +17,15 @@ pipeline {
                                                         trackingSubmodules: false
                                                       ]],
                                                       submoduleCfg: [],
-                                                      userRemoteConfigs: [[credentialsId: 'git-id', url: 'http://xx/xx/demo.git']]])
-          sh '''cat > demo-admin-api/admin.yml <<EOF
+                                                      userRemoteConfigs: [[credentialsId: 'git-id', url: 'http://xxx/xxx.git']]])
+          sh '''cat > xxxxx.yml <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: demo-admin-backend-prod
-  namespace: demo
+  name: backend-prod
+  namespace: java
   labels:
-    app: demo-admin-backend-prod
+    app: backend-prod
 spec:
   replicas: 3
   strategy:
@@ -34,76 +34,144 @@ spec:
       maxUnavailable: 1
   selector:
     matchLabels:
-      app: demo-admin-backend-prod
+      app: backend-prod
   template:
     metadata:
       labels:
-        app: demo-admin-backend-prod
+        app: backend-prod
     spec:
+      imagePullSecrets:
+        - name: images-registry-id
+      initContainers:
+        - name: sky-agent
+          image: image-registry-registry-vpc.cn-hongkong.cr.aliyuncs.com/ns/sky-agent:8.4
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "cp -r /agent /sidcar"]
+          volumeMounts:
+            - mountPath: /sidcar
+              name: sidcar
       containers:
-        - name: demo-admin-backend-prod
+        - name: backend-prod
           image: $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:PROD-$BUILD_NUMBER
           readinessProbe:
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 10
             tcpSocket:
               port: http
           livenessProbe:
-            periodSeconds: 30
+            periodSeconds: 60
             httpGet:
               port: http
-              path: /admin/member/memberInfo/page
+              path: /api/healthcheck
           ports:
             - name: http
               containerPort: 8080
           resources:
             requests:
               cpu: "300m"
-              memory: "1000Mi"
+              memory: "1024Mi"
             limits:
               cpu: "700m"
               memory: "4096Mi"
           env:
+            - name: JAVA_AGENT
+              value: "-javaagent:/sidcar/agent/skywalking-agent.jar=agent.service_name=$APP_NAME,collector.backend_service=skywalking-oap.skywalking.svc:11800"
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: db-name
+                  key: MYSQL_DATABASE
+            - name: MYSQL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: db-name
+                  key: MYSQL_HOST
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-name
+                  key: MYSQL_PASSWORD
+            - name: MYSQL_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: db-name
+                  key: MYSQL_PORT
+            - name: MYSQL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-name
+                  key: MYSQL_USERNAME
+            - name: MARIADB_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: uiddb-name
+                  key: MARIADB_DATABASE
+            - name: MARIADB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: uiddb-name
+                  key: MARIADB_HOST
+            - name: MARIADB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: uiddb-name
+                  key: MARIADB_PASSWORD
+            - name: MARIADB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: uiddb-name
+                  key: MARIADB_PORT
+            - name: MARIADB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: uiddb-name
+                  key: MARIADB_USERNAME
             - name: REDIS_HOST
               valueFrom:
                 secretKeyRef:
-                  name: cp-redis
+                  name: redis
                   key: REDIS_HOST
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: cp-redis
+                  name: redis
                   key: REDIS_PASSWORD
             - name: REDIS_PORT
               valueFrom:
                 secretKeyRef:
-                  name: cp-redis
+                  name: redis
                   key: REDIS_PORT
             - name: NAMESPACE
               valueFrom:
                 secretKeyRef:
-                  name: cp-nacos
+                  name: nacos
                   key: NAMESPACE
             - name: PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: cp-nacos
+                  name: nacos
                   key: PASSWORD
             - name: REGISTER_HOST
               valueFrom:
                 secretKeyRef:
-                  name: cp-nacos
+                  name: nacos
                   key: REGISTER_HOST
             - name: REGISTER_PORT
               valueFrom:
                 secretKeyRef:
-                  name: cp-nacos
+                  name: nacos
                   key: REGISTER_PORT
             - name: USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: cp-nacos
+                  name: nacos
                   key: USERNAME
+          volumeMounts:
+            - mountPath: /sidcar
+              name: sidcar
+      volumes:
+        - name: sidcar
+          emptyDir: {}
 
 ---
 
@@ -111,29 +179,30 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: demo-admin-backend-prod
-  name: demo-admin-backend-prod-svc
-  namespace: demo
+    app: backend-prod
+  name: backend-prod-svc
+  namespace: java
 spec:
   ports:
     - port: 8080
       targetPort: 8080
-      nodePort: 30101
+      nodePort: 30104
   selector:
-    app: demo-admin-backend-prod
+    app: backend-prod
   type: NodePort
 
 EOF
 '''
-          sh '''cat > demo-admin-api/Dockerfile <<EOF
+          sh '''cat > business/Dockerfile <<'EOF'
 
 FROM openjdk:8-jdk-alpine
 VOLUME /tmp
-ADD demo-admin-api/target/*.jar app.jar
+ADD business/business-server/target/*.jar app.jar
 ENV JAVA_OPTS="-Xms256m"
 ENV TZ=Asia/Shanghai
+ENV JAVA_AGENT=""
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-ENTRYPOINT [ "sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar /app.jar" ]
+ENTRYPOINT [ "sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom $JAVA_AGENT -jar /app.jar" ]
 EXPOSE 8080
 EOF
 '''
@@ -143,7 +212,7 @@ EOF
         steps {
           container('maven') {
             sh 'mvn clean package -Dmaven.test.skip=true -e'
-            sh 'docker build -f demo-admin-api/Dockerfile -t $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:PROD-$BUILD_NUMBER .'
+            sh 'docker build -f business/Dockerfile -t $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:PROD-$BUILD_NUMBER .'
               withCredentials([usernamePassword(credentialsId : 'registry-id' ,passwordVariable : 'DOCKER_PASSWORD' ,usernameVariable : 'DOCKER_USERNAME' ,)]) {
             sh 'echo $DOCKER_PASSWORD'
             sh 'echo "$DOCKER_PASSWORD" | docker login $REGISTRY -u "$DOCKER_USERNAME" --password-stdin'
@@ -156,8 +225,18 @@ EOF
       }
       stage('发布到PROD环境') {
         steps {
-          kubernetesDeploy(enableConfigSubstitution: true, deleteResource: false, kubeconfigId: 'kubeconfig-id', configs: 'demo-admin-api/admin.yml')
+          kubernetesDeploy(enableConfigSubstitution: true, deleteResource: false, kubeconfigId: 'kubeconfig-id', configs: 'business/business.yml')
         }
       }
+    }
+    post {
+        //任务失败执行
+        failure {
+          sh "wget --post-data 'content=彩票 线上K8S环境 business 流水线执行失败' https://discord.com/api/webhooks/831799591984693249/O3pgcn-AEBVmkkqeROpk6SDXwX02tVocV5y6zTDZwX6DIWOfo71ms3320dlNuryijlOY"
+        }
+        //任务成功后执行
+        success {
+          sh "wget --post-data 'content=彩票 线上K8S环境 business 流水线执行完成' https://discord.com/api/webhooks/831799591984693249/O3pgcn-AEBVmkkqeROpk6SDXwX02tVocV5y6zTDZwX6DIWOfo71ms3320dlNuryijlOY"
+        }    
     }
   }

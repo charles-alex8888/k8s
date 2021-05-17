@@ -8,26 +8,26 @@ pipeline {
   stages {
     stage('拉取源代码') {
       steps {
-        git(url: 'http://xxxx/xxxx/xxxx.git', credentialsId: 'git-id', branch: 'master', changelog: true, poll: false)
+        git(url: 'http://git.subocloud.com/Lottery/lottery-h5.git', credentialsId: 'git-id', branch: 'master', changelog: true, poll: false)
         sh '''cat > Dockerfile <<EOF
 FROM nginx:latest
 RUN mkdir /home/html
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-COPY demo.conf /etc/nginx/conf.d/demo.conf
+COPY cp-h5.conf /etc/nginx/conf.d/cp-h5.conf
 COPY dist/  /home/html/
 EXPOSE 80
 
 EOF
 '''
-sh '''cat > demo.yml <<EOF
+        sh '''cat > cp-h5.yml <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: demo-h5-frontend-prod
-  namespace: demo
+  name: lottery-h5-frontend-prod
+  namespace: lottery
   labels:
-    app: demo-h5-frontend-prod
+    app: lottery-h5-frontend-prod
 spec:
   replicas: 3
   strategy:
@@ -36,14 +36,16 @@ spec:
       maxUnavailable: 1
   selector:
     matchLabels:
-      app: demo-h5-frontend-prod
+      app: lottery-h5-frontend-prod
   template:
     metadata:
       labels:
-        app: demo-h5-frontend-prod
+        app: lottery-h5-frontend-prod
     spec:
+      imagePullSecrets:
+        - name: images-registry-id
       containers:
-        - name: demo-h5-frontend-prod
+        - name: lottery-h5-frontend-prod
           image: $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:PROD-$BUILD_NUMBER
           resources:
             requests:
@@ -68,6 +70,24 @@ spec:
             - name: http
               containerPort: 80
 ---
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: lottery-h5-frontend-prod
+  name: lottery-h5-frontend-prod-svc
+  namespace: lottery
+spec:
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30110
+  selector:
+    app: lottery-h5-frontend-prod
+  type: NodePort
+  
+---
 kind: HorizontalPodAutoscaler
 apiVersion: autoscaling/v2beta1
 metadata:
@@ -89,24 +109,6 @@ spec:
       resource:
         name: memory
         targetAverageValue: 1700Mi
----
-
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: demo-h5-frontend-prod
-  name: demo-h5-frontend-prod-svc
-  namespace: demo
-spec:
-  ports:
-    - port: 80
-      targetPort: 80
-      nodePort: 30110
-  selector:
-    app: demo-h5-frontend-prod
-  type: NodePort
-
 EOF
 '''
       }
@@ -116,7 +118,7 @@ EOF
         container('nodejs') {
           sh 'npm install'
           sh 'npm  run release'
-          sh '''cat >demo.conf<<EOF
+          sh '''cat >cp-h5.conf<<EOF
 
 server {
    listen       80 default_server;
@@ -140,7 +142,7 @@ server {
 
    location ~* ^/(v1) {
             rewrite ^/v1/(.+?)$ /\\$1 break; 
-            proxy_pass       http://demo-app-backend-prod-svc.demo:8080;
+            proxy_pass       http://lottery-app-backend-prod-svc.lottery:8080;
             proxy_set_header Host      \\$host;
             proxy_set_header X-Real-IP \\$remote_addr;
             proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
@@ -148,7 +150,7 @@ server {
    }
   location ~* ^/(v2) {
         rewrite ^/v2/(.+?)$ /\\$1 break; 
-        proxy_pass       http://demo-app-backend-prod-svc.demo:8080;
+        proxy_pass       http://lottery-app-backend-prod-svc.lottery:8080;
         proxy_set_header Host \\$host;
         proxy_set_header X-Real-IP \\$remote_addr;
         proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
@@ -178,8 +180,18 @@ EOF'''
     }
     stage('发布到PROD环境') {
       steps {
-        kubernetesDeploy(enableConfigSubstitution: true, deleteResource: false, kubeconfigId: 'kubeconfig-id', configs: 'demo.yml')
+        kubernetesDeploy(enableConfigSubstitution: true, deleteResource: false, kubeconfigId: 'kubeconfig-id', configs: 'cp-h5.yml')
       }
     }
   }
+    post {
+        //任务失败执行
+        failure {
+          sh "wget --post-data 'content=<@831044360643543071>彩票 线上K8S环境 H5前端 流水线执行失败 ' https://discord.com/api/webhooks/831799591984693249/O3pgcn-AEBVmkkqeROpk6SDXwX02tVocV5y6zTDZwX6DIWOfo71ms3320dlNuryijlOY"
+        }
+        //任务成功后执行
+        success {
+          sh "wget --post-data 'content=<@831044360643543071>彩票 线上K8S环境 H5前端 流水线执行成功 ' https://discord.com/api/webhooks/831799591984693249/O3pgcn-AEBVmkkqeROpk6SDXwX02tVocV5y6zTDZwX6DIWOfo71ms3320dlNuryijlOY"
+        }    
+    }
 }
